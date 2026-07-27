@@ -26,14 +26,42 @@ TEXT_LIGHT = "#E8E9ED"
 TEXT_MUTED = "#9AA0AC"
 RED_PAHALI = "#E05252"
 
+UI_SCALE = 0.85
+
 CUSTOM_CSS = f"""
 <style>
     .stApp {{
         background-color: {BG_DARK};
         color: {TEXT_LIGHT};
     }}
-    button[data-testid="collapsedControl"] {{
-        display: none;
+    @media (min-width: 900px) {{
+        .stApp {{
+            zoom: {UI_SCALE};
+        }}
+        button[data-testid="collapsedControl"] {{
+            display: none;
+        }}
+    }}
+    [data-testid="stWidgetLabel"] p,
+    [data-testid="stWidgetLabel"] label,
+    .stRadio label, .stCheckbox label, .stSlider label {{
+        color: {TEXT_LIGHT} !important;
+    }}
+    [data-testid="stCaptionContainer"] p,
+    [data-testid="stCaptionContainer"] {{
+        color: {TEXT_MUTED} !important;
+    }}
+    [data-baseweb="select"] > div,
+    [data-baseweb="popover"] li {{
+        background-color: {BG_CARD} !important;
+        color: {TEXT_LIGHT} !important;
+    }}
+    [data-testid="stExpander"] details {{
+        background-color: {BG_CARD};
+        border-color: {BG_CARD_BORDER};
+    }}
+    [data-testid="stExpander"] summary p {{
+        color: {TEXT_LIGHT} !important;
     }}
     section[data-testid="stSidebar"] {{
         background-color: {BG_CARD};
@@ -777,7 +805,7 @@ def render_header():
                 {hexagon_ball_logo_svg()}
                 <div>
                     <div class="scout-title">SCOUT<span class="scout-title-white">AI</span></div>
-                    <div class="scout-subtitle">FUTBOLCU SCOUTİNG, DEĞERLEME VE ÖNERİ PLATFORMU</div>
+                    <div class="scout-subtitle">FUTBOLCU SCOUTING, DEĞERLEME VE ÖNERİ PLATFORMU</div>
                 </div>
             </div>
             {feature_chips_html()}
