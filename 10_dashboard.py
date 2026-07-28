@@ -1386,6 +1386,28 @@ def page_genel_bakis(combined: pd.DataFrame, config: Config):
         (_icon_chart_up, "RMSE", format_euro(metrikler["rmse"]), ACCENT_PURPLE),
     ])), unsafe_allow_html=True)
 
+    sezonlar = sorted(combined["season"].dropna().unique())
+    st.markdown(_flatten_html(f"""
+    <div style="background-color:{BG_CARD}; border:1px solid {BG_CARD_BORDER};
+                border-left:3px solid {ACCENT_BLUE}; border-radius:8px;
+                padding:11px 16px; margin-bottom:16px;
+                display:flex; align-items:center; gap:10px;">
+        <svg width="18" height="18" viewBox="0 0 40 40">
+            <circle cx="20" cy="20" r="16" fill="none" stroke="{ACCENT_BLUE}" stroke-width="2.5"/>
+            <line x1="20" y1="17" x2="20" y2="29" stroke="{ACCENT_BLUE}" stroke-width="3"
+                  stroke-linecap="round"/>
+            <circle cx="20" cy="11.5" r="2" fill="{ACCENT_BLUE}"/>
+        </svg>
+        <div style="color:{TEXT_MUTED}; font-size:12.5px; line-height:1.5;">
+            <b style="color:{TEXT_LIGHT};">Veri kapsamı:</b> Bu platformdaki tüm analizler
+            <b style="color:{ACCENT_BLUE};">{sezonlar[0]}</b> ve
+            <b style="color:{ACCENT_BLUE};">{sezonlar[-1]}</b> sezonlarına ait verilere dayanır.
+            Her oyuncu için veri setindeki en güncel kayıt kullanılmıştır; piyasa değerleri
+            o döneme aittir ve güncel transfer piyasasını yansıtmaz.
+        </div>
+    </div>
+    """), unsafe_allow_html=True)
+
     st.markdown(_flatten_html(f"""
     <div class="scout-welcome-card">
         <div style="font-size:22px; font-weight:800; color:{TEXT_LIGHT};">
