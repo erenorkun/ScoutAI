@@ -42,6 +42,71 @@ CUSTOM_CSS = f"""
             display: none;
         }}
     }}
+    @media (max-width: 899px) {{
+        button[data-testid="collapsedControl"] {{
+            position: relative !important;
+            overflow: visible !important;
+            border: 1px solid {ACCENT_GREEN} !important;
+            border-radius: 6px !important;
+            background-color: {BG_CARD} !important;
+            margin-bottom: 16px !important;
+        }}
+        button[data-testid="collapsedControl"] svg {{
+            fill: {ACCENT_GREEN} !important;
+            color: {ACCENT_GREEN} !important;
+        }}
+        button[data-testid="collapsedControl"]::after {{
+            content: "MENÜ";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            margin-top: 2px;
+            font-size: 10px;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            color: {ACCENT_GREEN};
+            white-space: nowrap;
+        }}
+        .scout-header-wrap {{
+            flex-direction: column !important;
+            align-items: stretch !important;
+            overflow: visible !important;
+            padding: 14px 16px !important;
+        }}
+        .scout-header-wrap > div {{
+            flex: none !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            min-width: 0 !important;
+            margin: 0 0 12px 0 !important;
+        }}
+        .scout-header-left {{
+            gap: 12px !important;
+        }}
+        .scout-title {{
+            font-size: 30px !important;
+        }}
+        .scout-subtitle {{
+            font-size: 11px !important;
+            letter-spacing: 0.3px !important;
+            line-height: 1.35 !important;
+        }}
+        .scout-chip-row {{
+            flex-wrap: wrap !important;
+            gap: 14px !important;
+            justify-content: flex-start !important;
+        }}
+        .scout-chip {{
+            min-width: 66px !important;
+        }}
+        .scout-chip-label {{
+            font-size: 9px !important;
+        }}
+        .scout-badge-row {{
+            font-size: 11px !important;
+        }}
+    }}
     [data-testid="stWidgetLabel"] p,
     [data-testid="stWidgetLabel"] label,
     .stRadio label, .stCheckbox label, .stSlider label {{
