@@ -42,31 +42,37 @@ CUSTOM_CSS = f"""
             display: none;
         }}
     }}
+    .scout-mobile-menu-hint {{
+        display: none;
+    }}
     @media (max-width: 899px) {{
-        button[data-testid="collapsedControl"] {{
-            position: relative !important;
-            overflow: visible !important;
+        .scout-mobile-menu-hint {{
+            display: flex !important;
+            align-items: center;
+            gap: 9px;
+            background-color: {BG_CARD};
+            border: 1px solid {ACCENT_GREEN};
+            border-left: 4px solid {ACCENT_GREEN};
+            border-radius: 8px;
+            padding: 10px 14px;
+            margin-bottom: 14px;
+            color: {TEXT_LIGHT};
+            font-size: 12.5px;
+            line-height: 1.45;
+        }}
+        [data-testid="stSidebarCollapsedControl"],
+        [data-testid="collapsedControl"],
+        button[data-testid="collapsedControl"],
+        button[data-testid="stSidebarCollapseButton"] {{
             border: 1px solid {ACCENT_GREEN} !important;
             border-radius: 6px !important;
             background-color: {BG_CARD} !important;
-            margin-bottom: 16px !important;
         }}
-        button[data-testid="collapsedControl"] svg {{
+        [data-testid="stSidebarCollapsedControl"] svg,
+        [data-testid="collapsedControl"] svg,
+        button[data-testid="stSidebarCollapseButton"] svg {{
             fill: {ACCENT_GREEN} !important;
             color: {ACCENT_GREEN} !important;
-        }}
-        button[data-testid="collapsedControl"]::after {{
-            content: "MENÜ";
-            position: absolute;
-            top: 100%;
-            left: 50%;
-            transform: translateX(-50%);
-            margin-top: 2px;
-            font-size: 10px;
-            font-weight: 800;
-            letter-spacing: 0.8px;
-            color: {ACCENT_GREEN};
-            white-space: nowrap;
         }}
         .scout-header-wrap {{
             flex-direction: column !important;
@@ -895,6 +901,7 @@ def load_combined_data():
     ref = pd.read_csv(config.DATA_DIR / config.PLAYER_REFERENCE_FILE)
     combined = pd.concat([ref.reset_index(drop=True), df.reset_index(drop=True)], axis=1)
     combined = combined.loc[:, ~combined.columns.duplicated()]
+    combined["_pozisyon"] = combined.apply(lambda r: get_position_display(r, config), axis=1)
     return combined
 
 
@@ -1007,15 +1014,27 @@ def mevcut_bas_harfler(isimler: tuple) -> list:
 
 
 def player_selectbox(combined: pd.DataFrame, key: str, label: str = "Oyuncu Seçin:",
-                     harf_filtresi: bool = False):
+                     harf_filtresi: bool = False, pozisyon_filtresi: bool = False):
     havuz = combined
+
+    if pozisyon_filtresi and "_pozisyon" in combined.columns:
+        pozisyonlar = sorted(p for p in combined["_pozisyon"].dropna().unique()
+                             if p != "Belirlenemedi")
+        secilen_pozisyon = st.selectbox(
+            "Pozisyon", ["Tüm Pozisyonlar"] + pozisyonlar, key=f"{key}_pozisyon",
+        )
+        if secilen_pozisyon != "Tüm Pozisyonlar":
+            filtreli = havuz[havuz["_pozisyon"] == secilen_pozisyon]
+            if len(filtreli) > 0:
+                havuz = filtreli
+
     if harf_filtresi:
-        harfler = mevcut_bas_harfler(tuple(combined["player_name"].dropna().unique()))
+        harfler = mevcut_bas_harfler(tuple(havuz["player_name"].dropna().unique()))
         secilen_harf = st.radio(
             "Baş Harf", ["Tümü"] + harfler, key=f"{key}_harf", horizontal=True,
         )
         if secilen_harf != "Tümü":
-            filtreli = combined[combined["player_name"].apply(_ilk_harf) == secilen_harf]
+            filtreli = havuz[havuz["player_name"].apply(_ilk_harf) == secilen_harf]
             if len(filtreli) > 0:
                 havuz = filtreli
 
@@ -1277,6 +1296,57 @@ def get_position_code(row, config: Config) -> str:
     return "-"
 
 
+def sentetik_profil_satiri(combined: pd.DataFrame, config: Config,
+                           target_vector, ozellikler, position_group=None):
+    tum_ozellikler = list(dict.fromkeys(
+        list(config.SIMILARITY_FEATURES) + list(config.SIMILARITY_FEATURES_KALECI)))
+    mevcut = [f for f in tum_ozellikler if f in combined.columns]
+    satir = combined[mevcut].mean()
+
+    for ad, deger in zip(ozellikler, target_vector):
+        if ad in satir.index:
+            satir[ad] = float(deger)
+
+    for grup, kolonlar in config.POSITION_GROUPS.items():
+        for kolon in kolonlar:
+            satir[kolon] = 0
+    if position_group and position_group in config.POSITION_GROUPS:
+        satir[config.POSITION_GROUPS[position_group][0]] = 1
+
+    satir["player_name"] = "Özel Profil"
+    satir["team_name"] = "—"
+    satir["season"] = "—"
+    satir["League"] = "—"
+    return satir
+
+
+def ozel_profil_karti(row, config: Config, renk: str, position_group=None):
+    grup_adi = (config.GROUP_DISPLAY_NAMES.get(position_group, position_group)
+                if position_group else "Filtre yok")
+
+    st.markdown(_flatten_html(f"""
+    <div style="background-color:{BG_CARD}; border:1px solid {BG_CARD_BORDER};
+                border-left:3px solid {renk}; border-radius:10px; padding:18px 16px;
+                text-align:center; margin-bottom:10px;">
+        <svg width="58" height="58" viewBox="0 0 40 40" style="margin-bottom:6px;">
+            <circle cx="20" cy="20" r="16" fill="none" stroke="{renk}" stroke-width="2"/>
+            <circle cx="20" cy="20" r="9" fill="none" stroke="{renk}" stroke-width="2"/>
+            <circle cx="20" cy="20" r="2.5" fill="{renk}"/>
+        </svg>
+        <div style="font-size:19px; font-weight:800; color:{renk};">Özel Profil</div>
+        <div style="color:{TEXT_MUTED}; font-size:12.5px; margin-top:6px; line-height:1.5;">
+            Sizin belirlediğiniz hedef özellikler<br>
+            Aranan pozisyon: <b style="color:{TEXT_LIGHT};">{grup_adi}</b>
+        </div>
+        <div style="color:{TEXT_MUTED}; font-size:11.5px; margin-top:10px;
+                    border-top:1px solid {BG_CARD_BORDER}; padding-top:9px;">
+            Bu profil veri setinde gerçek bir oyuncuya ait değildir;
+            belirtilmeyen özellikler için veri seti ortalaması kullanılmıştır.
+        </div>
+    </div>
+    """), unsafe_allow_html=True)
+
+
 def player_compare_card(row, config: Config, renk: str):
     foto_url = get_player_photo_from_row(row)
     logo_url = get_team_logo_url(row["team_name"])
@@ -1310,7 +1380,8 @@ def player_compare_card(row, config: Config, renk: str):
     st.metric("Piyasa Değeri", format_euro(row[config.TARGET_COLUMN]))
 
 
-def player_comparison_block(sol_row, sag_row, config: Config):
+def player_comparison_block(sol_row, sag_row, config: Config,
+                            sol_ozel_profil: bool = False, position_group=None):
     sol_ad = str(sol_row["player_name"])
     sag_ad = str(sag_row["player_name"])
     if sol_ad == sag_ad:
@@ -1334,7 +1405,10 @@ def player_comparison_block(sol_row, sag_row, config: Config):
     kol_sol, kol_orta, kol_sag = st.columns([1.1, 1.3, 1.1])
 
     with kol_sol:
-        player_compare_card(sol_row, config, ACCENT_BLUE)
+        if sol_ozel_profil:
+            ozel_profil_karti(sol_row, config, ACCENT_BLUE, position_group)
+        else:
+            player_compare_card(sol_row, config, ACCENT_BLUE)
 
     with kol_orta:
         kategoriler = list(kategori_sozlugu.keys())
@@ -1535,7 +1609,7 @@ def page_veri_analizi(combined: pd.DataFrame, config: Config):
 # Oyuncu Analizi
 
 def page_oyuncu_analizi(combined: pd.DataFrame, config: Config):
-    oyuncu = player_selectbox(combined, key="oyuncu_analizi_secim")
+    oyuncu = player_selectbox(combined, key="oyuncu_analizi_secim", pozisyon_filtresi=True)
 
     pozisyon = get_position_display(oyuncu, config)
     foto_url = get_player_photo_from_row(oyuncu)
@@ -1673,9 +1747,11 @@ def page_oyuncu_karsilastirma(combined: pd.DataFrame, config: Config):
     scout_card_start("KARŞILAŞTIRILACAK OYUNCULAR")
     s1, s2 = st.columns(2)
     with s1:
-        sol_row = player_selectbox(combined, key="karsilastirma_sol", label="1. Oyuncu:")
+        sol_row = player_selectbox(combined, key="karsilastirma_sol", label="1. Oyuncu:",
+                                   pozisyon_filtresi=True)
     with s2:
-        sag_row = player_selectbox(combined, key="karsilastirma_sag", label="2. Oyuncu:")
+        sag_row = player_selectbox(combined, key="karsilastirma_sag", label="2. Oyuncu:",
+                                   pozisyon_filtresi=True)
     scout_card_end()
 
     player_comparison_block(sol_row, sag_row, config)
@@ -1889,7 +1965,8 @@ def get_target_vector_ui(combined: pd.DataFrame, config: Config):
 
     if mod == "Bir Yıldıza Benzet":
         eslesen = player_selectbox(combined, key="hedef_oyuncu_secim",
-                                   label="Örnek Alınacak Oyuncu:", harf_filtresi=True)
+                                   label="Örnek Alınacak Oyuncu:", harf_filtresi=True,
+                                   pozisyon_filtresi=True)
         ozellikler = (config.SIMILARITY_FEATURES_KALECI if is_kaleci(eslesen)
                       else config.SIMILARITY_FEATURES)
         target_vector = eslesen[ozellikler].values.astype(float)
@@ -2084,6 +2161,9 @@ def page_akilli_karar_masasi(combined: pd.DataFrame, config: Config):
         st.session_state["scout_target_index"] = excluded_index
         st.session_state["scout_target_label"] = target_label
         st.session_state["scout_team_label"] = team_label
+        st.session_state["scout_target_vector"] = target_vector
+        st.session_state["scout_ozellikler"] = ozellikler
+        st.session_state["scout_position_group"] = position_group
         st.session_state.pop("scout_karsilastir", None)
 
     result = st.session_state.get("scout_result")
@@ -2094,9 +2174,9 @@ def page_akilli_karar_masasi(combined: pd.DataFrame, config: Config):
                f"  |  Kulüp: {st.session_state['scout_team_label']}")
 
     hedef_index = st.session_state.get("scout_target_index")
-    if hedef_index is not None:
-        st.caption("Bir adayı hedef profille yan yana karşılaştırmak için satırındaki "
-                   "**Karşılaştır** düğmesine basın.")
+    ozel_profil_modu = hedef_index is None
+    st.caption("Bir adayı hedef profille yan yana karşılaştırmak için satırındaki "
+               "**Karşılaştır** düğmesine basın.")
 
     renk_haritasi = {"FIRSAT": ACCENT_GREEN, "PAHALI": RED_PAHALI, "MAKUL": TEXT_MUTED}
 
@@ -2108,24 +2188,32 @@ def page_akilli_karar_masasi(combined: pd.DataFrame, config: Config):
         with kart_col:
             st.markdown(_flatten_html(oneri_karti_html(row, config, renk)), unsafe_allow_html=True)
         with dugme_col:
-            if hedef_index is not None:
-                etiket = "Kapat" if secilen_idx == idx else "Karşılaştır"
-                if st.button(etiket, key=f"cmp_{idx}", use_container_width=True):
-                    if secilen_idx == idx:
-                        st.session_state.pop("scout_karsilastir", None)
-                    else:
-                        st.session_state["scout_karsilastir"] = idx
-                    st.rerun()
+            etiket = "Kapat" if secilen_idx == idx else "Karşılaştır"
+            if st.button(etiket, key=f"cmp_{idx}", use_container_width=True):
+                if secilen_idx == idx:
+                    st.session_state.pop("scout_karsilastir", None)
+                else:
+                    st.session_state["scout_karsilastir"] = idx
+                st.rerun()
 
-        if secilen_idx == idx and hedef_index is not None:
+        if secilen_idx == idx:
             st.markdown(f'<div class="scout-section-title">HEDEF PROFİL vs '
                         f'{row["player_name"].upper()}</div>', unsafe_allow_html=True)
-            player_comparison_block(combined.loc[hedef_index], combined.loc[idx], config)
+            if ozel_profil_modu:
+                hedef_satir = sentetik_profil_satiri(
+                    combined, config,
+                    st.session_state.get("scout_target_vector"),
+                    st.session_state.get("scout_ozellikler"),
+                    st.session_state.get("scout_position_group"),
+                )
+                player_comparison_block(
+                    hedef_satir, combined.loc[idx], config,
+                    sol_ozel_profil=True,
+                    position_group=st.session_state.get("scout_position_group"),
+                )
+            else:
+                player_comparison_block(combined.loc[hedef_index], combined.loc[idx], config)
             st.markdown('<div class="scout-section-end"></div>', unsafe_allow_html=True)
-
-    if secilen_idx is not None and hedef_index is None:
-        st.info("Karşılaştırma için hedef profilin gerçek bir oyuncu olması gerekir "
-                "(\"Bir Yıldıza Benzet\" modu).")
 
 
 # Ana Uygulama
@@ -2133,6 +2221,14 @@ def page_akilli_karar_masasi(combined: pd.DataFrame, config: Config):
 def main():
     st.set_page_config(page_title="ScoutAI - Akıllı Scout Sistemi", layout="wide")
     st.markdown(CUSTOM_CSS, unsafe_allow_html=True)
+
+    st.markdown(_flatten_html(f"""
+    <div class="scout-mobile-menu-hint">
+        <span style="color:{ACCENT_GREEN}; font-size:18px; font-weight:900;">&raquo;</span>
+        <span>Sayfalar arasında geçiş için sol üstteki
+        <b style="color:{ACCENT_GREEN};">&raquo;</b> simgesine dokunun</span>
+    </div>
+    """), unsafe_allow_html=True)
 
     render_header()
 
