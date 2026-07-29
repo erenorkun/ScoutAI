@@ -493,8 +493,10 @@ class Config:
         "Scotland": "İskoçya", "Switzerland": "İsviçre",
     }
 
-    BENZERLIK_AGIRLIGI = 0.70
-    TAKIM_UYUM_AGIRLIGI = 0.30
+    BENZERLIK_AGIRLIGI = 0.65
+    TAKIM_UYUM_AGIRLIGI = 0.25
+    GELISIM_AGIRLIGI = 0.10
+    GELISIM_YAS_ESIGI = 27
 
     DISPLAY_NAMES = {
         "buildUpPlaySpeed": "Hızlı Oyun Kurma", "buildUpPlayDribbling": "Top Sürerek İlerleme",
@@ -521,7 +523,8 @@ class Config:
     }
 
     RADAR_KATEGORILERI = {
-        "Şut": ["finishing", "shot_power", "long_shots", "volleys", "penalties"],
+        "Şut": ["finishing", "shot_power", "long_shots", "volleys", "penalties", "positioning"],
+        "Teknik": ["crossing", "heading_accuracy", "reactions", "free_kick_accuracy"],
         "Fiziksel": ["strength", "stamina", "jumping", "aggression"],
         "Pas": ["short_passing", "long_passing", "vision", "curve"],
         "Top Sürme": ["dribbling", "ball_control", "agility", "balance"],
@@ -1916,6 +1919,13 @@ def page_takim_karsilastirma(combined: pd.DataFrame, config: Config):
 
 # Karar Masası
 
+def _min_max(seri: pd.Series) -> pd.Series:
+    aralik = seri.max() - seri.min()
+    if aralik <= 0:
+        return pd.Series(0.5, index=seri.index)
+    return (seri - seri.min()) / aralik
+
+
 def compute_similarity(combined, target_vector, config, ozellikler=None):
     kullanilacak = ozellikler if ozellikler is not None else config.SIMILARITY_FEATURES
     X = combined[kullanilacak].values.astype(float)
@@ -2068,9 +2078,14 @@ def scout_raporu_hesapla(combined, config, target_vector, team_style, excluded_i
     else:
         result["takim_uyum_skoru"] = 0.5
 
+    ivme = (result["potential"] - result["overall_rating"]).clip(lower=0)
+    genclik = (config.GELISIM_YAS_ESIGI - result["Age"]).clip(lower=0)
+    result["gelisim_skoru"] = 0.5 * _min_max(ivme) + 0.5 * _min_max(genclik)
+
     result["scout_skoru"] = (
         config.BENZERLIK_AGIRLIGI * result["benzerlik_skoru"]
         + config.TAKIM_UYUM_AGIRLIGI * result["takim_uyum_skoru"]
+        + config.GELISIM_AGIRLIGI * result["gelisim_skoru"]
     )
     result = result.sort_values("scout_skoru", ascending=False).head(top_n)
 
@@ -2117,6 +2132,7 @@ def oneri_karti_html(row, config: Config, renk: str) -> str:
             Yaş: <b style="color:{TEXT_LIGHT};">{row['Age']:.0f}</b> &nbsp;|&nbsp;
             Benzerlik: <b style="color:{ACCENT_GREEN};">%{row['benzerlik_skoru']*100:.1f}</b> &nbsp;|&nbsp;
             Kulüp Uyumu: <b style="color:{ACCENT_GREEN};">%{row['takim_uyum_skoru']*100:.1f}</b> &nbsp;|&nbsp;
+            Gelişim: <b style="color:{ACCENT_GREEN};">%{row['gelisim_skoru']*100:.1f}</b> &nbsp;|&nbsp;
             Scout Skoru: <b style="color:{ACCENT_GREEN};">%{row['scout_skoru']*100:.1f}</b>
         </div>
         <div style="margin-top:6px; color:{TEXT_LIGHT}; font-size:13px;">
