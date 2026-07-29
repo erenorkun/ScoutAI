@@ -1451,7 +1451,7 @@ def page_genel_bakis(combined: pd.DataFrame, config: Config):
     metrikler = compute_overall_metrics_cached()
 
     st.markdown(_flatten_html(stat_cards_html([
-        (_icon_people, "OYUNCU", f"{combined['player_name'].nunique():,}", ACCENT_GREEN),
+        (_icon_people, "OYUNCU", f"{combined['player_api_id'].nunique():,}", ACCENT_GREEN),
         (_icon_shield, "TAKIM", f"{combined['team_name'].nunique()}", ACCENT_GREEN),
         (_icon_globe, "LİG", f"{combined['League'].nunique()}", ACCENT_BLUE),
         (_icon_cpu, "EN İYİ MODEL", metrikler["model_adi"], ACCENT_PURPLE),
