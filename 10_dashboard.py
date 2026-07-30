@@ -1013,8 +1013,18 @@ def mevcut_bas_harfler(isimler: tuple) -> list:
     return sorted({_ilk_harf(i) for i in isimler})
 
 
+def _varsayilan_index(secenekler, aranan):
+    if not aranan:
+        return 0
+    for i, secenek in enumerate(secenekler):
+        if secenek == aranan or secenek.startswith(aranan + " —"):
+            return i
+    return 0
+
+
 def player_selectbox(combined: pd.DataFrame, key: str, label: str = "Oyuncu Seçin:",
-                     harf_filtresi: bool = False, pozisyon_filtresi: bool = False):
+                     harf_filtresi: bool = False, pozisyon_filtresi: bool = False,
+                     varsayilan: str = None):
     havuz = combined
 
     if pozisyon_filtresi and "_pozisyon" in combined.columns:
@@ -1047,12 +1057,15 @@ def player_selectbox(combined: pd.DataFrame, key: str, label: str = "Oyuncu Seç
             etiket = f"{temel_etiket} #{sayac}"
             sayac += 1
         etiketler[etiket] = idx
-    secilen_etiket = st.selectbox(label, sorted(etiketler.keys()), key=key)
+    secenekler = sorted(etiketler.keys())
+    secilen_etiket = st.selectbox(label, secenekler,
+                                  index=_varsayilan_index(secenekler, varsayilan), key=key)
     return havuz.loc[etiketler[secilen_etiket]]
 
 
 def team_selectbox(combined: pd.DataFrame, key: str, label: str = "Kulüp Seçin:",
-                   harf_filtresi: bool = False, haric: str = None):
+                   harf_filtresi: bool = False, haric: str = None,
+                   varsayilan: str = None):
     takimlar = sorted(combined["team_name"].dropna().unique())
     if haric:
         takimlar = [t for t in takimlar if t != haric]
@@ -1067,7 +1080,8 @@ def team_selectbox(combined: pd.DataFrame, key: str, label: str = "Kulüp Seçin
             if filtreli:
                 takimlar = filtreli
 
-    return st.selectbox(label, takimlar, key=key)
+    return st.selectbox(label, takimlar,
+                        index=_varsayilan_index(takimlar, varsayilan), key=key)
 
 
 BUTCE_SECENEKLERI = [
@@ -1609,7 +1623,8 @@ def page_veri_analizi(combined: pd.DataFrame, config: Config):
 # Oyuncu Analizi
 
 def page_oyuncu_analizi(combined: pd.DataFrame, config: Config):
-    oyuncu = player_selectbox(combined, key="oyuncu_analizi_secim", pozisyon_filtresi=True)
+    oyuncu = player_selectbox(combined, key="oyuncu_analizi_secim", pozisyon_filtresi=True,
+                              varsayilan="Hakan Calhanoglu")
 
     pozisyon = get_position_display(oyuncu, config)
     foto_url = get_player_photo_from_row(oyuncu)
@@ -1675,7 +1690,9 @@ def page_oyuncu_analizi(combined: pd.DataFrame, config: Config):
 
 def page_takim_analizi(combined: pd.DataFrame, config: Config):
     takim_listesi = sorted(combined["team_name"].dropna().unique())
-    secilen_takim = st.selectbox("Takım Seçin:", takim_listesi, key="takim_analizi_secim")
+    secilen_takim = st.selectbox("Takım Seçin:", takim_listesi,
+                                 index=_varsayilan_index(takim_listesi, "FC Barcelona"),
+                                 key="takim_analizi_secim")
 
     takim_satirlari = combined[combined["team_name"] == secilen_takim]
     profil = takim_satirlari[config.TEAM_TACTIC_FEATURES].mean()
@@ -1748,10 +1765,10 @@ def page_oyuncu_karsilastirma(combined: pd.DataFrame, config: Config):
     s1, s2 = st.columns(2)
     with s1:
         sol_row = player_selectbox(combined, key="karsilastirma_sol", label="1. Oyuncu:",
-                                   pozisyon_filtresi=True)
+                                   pozisyon_filtresi=True, varsayilan="Hakan Calhanoglu")
     with s2:
         sag_row = player_selectbox(combined, key="karsilastirma_sag", label="2. Oyuncu:",
-                                   pozisyon_filtresi=True)
+                                   pozisyon_filtresi=True, varsayilan="Arda Turan")
     scout_card_end()
 
     player_comparison_block(sol_row, sag_row, config)
@@ -1842,7 +1859,9 @@ def page_takim_karsilastirma(combined: pd.DataFrame, config: Config):
     scout_card_start("KARŞILAŞTIRMA AYARLARI")
     s1, s2 = st.columns(2)
     with s1:
-        secilen_takim = st.selectbox("Takım Seçin:", takim_listesi, key="tk_takim")
+        secilen_takim = st.selectbox("Takım Seçin:", takim_listesi,
+                                     index=_varsayilan_index(takim_listesi, "FC Barcelona"),
+                                     key="tk_takim")
     with s2:
         hedef_tipi = st.radio(
             "Karşılaştırma Hedefi",
@@ -1966,7 +1985,7 @@ def get_target_vector_ui(combined: pd.DataFrame, config: Config):
     if mod == "Bir Yıldıza Benzet":
         eslesen = player_selectbox(combined, key="hedef_oyuncu_secim",
                                    label="Örnek Alınacak Oyuncu:", harf_filtresi=True,
-                                   pozisyon_filtresi=True)
+                                   pozisyon_filtresi=True, varsayilan="Mauro Icardi")
         ozellikler = (config.SIMILARITY_FEATURES_KALECI if is_kaleci(eslesen)
                       else config.SIMILARITY_FEATURES)
         target_vector = eslesen[ozellikler].values.astype(float)
@@ -2018,7 +2037,8 @@ def get_team_style_ui(combined: pd.DataFrame, config: Config):
 
     if mod == "Kulüp Seç":
         secilen_takim = team_selectbox(combined, key="hedef_takim_secim",
-                                       label="Kulüp Seçin:", harf_filtresi=True)
+                                       label="Kulüp Seçin:", harf_filtresi=True,
+                                       varsayilan="Chelsea")
         takim_satirlari = combined[combined["team_name"] == secilen_takim]
         team_style = {col: takim_satirlari[col].mean() for col in config.TEAM_TACTIC_FEATURES}
         return team_style, secilen_takim
@@ -2129,9 +2149,9 @@ def oneri_karti_html(row, config: Config, renk: str) -> str:
 
 def page_akilli_karar_masasi(combined: pd.DataFrame, config: Config):
     scout_card_start("ARAMA KRİTERLERİ")
-    target_vector, target_label, excluded_index, position_group, ozellikler = get_target_vector_ui(combined, config)
-    st.write("")
     team_style, team_label = get_team_style_ui(combined, config)
+    st.write("")
+    target_vector, target_label, excluded_index, position_group, ozellikler = get_target_vector_ui(combined, config)
 
     st.write("")
     col1, col2 = st.columns(2)
